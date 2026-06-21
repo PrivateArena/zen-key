@@ -7,9 +7,12 @@ import (
 	"runtime"
 
 	"gioui.org/app"
+	"gioui.org/font/gofont"
 	"gioui.org/op"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/unit"
+	"gioui.org/widget/material"
 )
 
 func main() {
@@ -24,6 +27,12 @@ func main() {
 	}
 
 	go func() {
+		cfg, err := LoadConfig()
+		if err != nil {
+			log.Printf("Warning: Failed to load config.json: %v. Using defaults.", err)
+			cfg = &DefaultConfig
+		}
+
 		// Initialize borderless fullscreen window context layout
 		w := new(app.Window)
 		w.Option(app.Title("Zen Fan Keyboard"))
@@ -31,8 +40,12 @@ func main() {
 		w.Option(app.TopMost(true))         // Ensure it sits above taskbars/docks
 		w.Option(app.Size(unit.Dp(60), unit.Dp(60))) // Start collapsed
 		
+		// Initialize material theme and gofont collection
+		th := material.NewTheme()
+		th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
+
 		// Set Gio initialization configurations
-		ui := NewAppUI(DefaultConfig, inputDev, w)
+		ui := NewAppUI(*cfg, inputDev, w, th)
 		if err := runWindow(w, ui); err != nil {
 			log.Fatal(err)
 		}
@@ -52,10 +65,10 @@ func runWindow(w *app.Window, ui *AppUI) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 			
-			// Position window at bottom-right on startup
+			// Position window on startup according to screen corner configuration
 			if !initialized {
 				initialized = true
-				go RepositionWindow(60, 60)
+				go RepositionWindow(ui.Config.ScreenPosition, 60, 60)
 			}
 
 			// Clear the frame with dark theme background (fallback for lack of transparency support)
